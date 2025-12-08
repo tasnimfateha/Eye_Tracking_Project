@@ -529,3 +529,43 @@ def generate_heatmap_plots():
 
 generate_heatmap_plots()
 
+
+def generate_general_heatmaps():
+    """
+    Create ONE heatmap per image, pooling fixations from ALL participants.
+    Saved into: visualisations/general
+    """
+    # All unique image identifiers from your data
+    images = sorted(all_fixations['Image'].unique())
+
+    # Output folder: visualisations/general
+    out_dir_general = os.path.join(OUT_DIR, "general")
+    os.makedirs(out_dir_general, exist_ok=True)
+
+    for img_key in images:
+        # Handle paths like "stimuli\\img_01.jpg" vs "img_01.jpg"
+        img_file = extract_image_filename(img_key)
+        img_path = os.path.join(STIM_DIR, img_file)
+
+        # All fixations on this image across ALL participants
+        img_fix = all_fixations[all_fixations['Image'] == img_key].copy()
+
+        if img_fix.empty:
+            print(f"[SKIP] No fixations for image: {img_key}")
+            continue
+
+        if not os.path.exists(img_path):
+            print(f"[WARN] Stimulus file not found for {img_key} at {img_path}")
+            continue
+
+        base_name = os.path.splitext(img_file)[0]
+        out_path = os.path.join(out_dir_general, base_name + "_heatmap.png")
+
+        title = f"All participants | {img_file}"
+        visualize_heatmap(img_fix, img_path, out_path, title=title)
+
+    print("General (all-participant) heatmaps generated in visualisations/general")
+
+generate_general_heatmaps()
+
+
