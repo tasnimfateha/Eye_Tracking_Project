@@ -323,17 +323,21 @@ print(per_subject_cond)
 # export
 # 1. per_trial
 # add familiarity and condition column
+per_trial['image_is_true'] = per_trial['Image'].str.startswith('true\\')
+trial_rating = all_behaviour[['Participant_ID', 'Image', 'Rating']].drop_duplicates()
+
 per_trial_with_cond = per_trial.merge(
-    all_behaviour[['Participant_ID', 'Image', 'Rating']],
+    trial_rating,
     on=['Participant_ID', 'Image'],
     how='left'
 )
-per_trial_with_cond['is_familiar'] = per_trial_with_cond['Rating'] >= 3
-per_trial_with_cond['condition'] = np.where(per_trial_with_cond['is_familiar'], 'familiar', 'unfamiliar')
+per_trial_with_cond['condition'] = np.where(
+    per_trial_with_cond['Rating'] >= 3, 'familiar', 'unfamiliar'
+)
 
-per_trial_file_with_cond = os.path.join(output_dir, "per_trial_metrics_with_condition.csv")
-per_trial_with_cond.to_csv(per_trial_file_with_cond, index=False)
-print(f"Saved per-trial metrics to {per_trial_with_cond}")
+per_trial_file_enhanced = os.path.join(output_dir, "per_trial_with_cond.csv")
+per_trial_with_cond.to_csv(per_trial_file_enhanced, index=False)
+print(f"Saved enhanced per-trial metrics to {per_trial_file_enhanced}")
 
 # 2. merged eye + behavioural data
 merged_file = os.path.join(output_dir, "merged_eye_behavior.csv")
