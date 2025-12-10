@@ -172,6 +172,15 @@ def process_one_participant_beh(participant_id, filepath):
 
     return beh
 
+def get_longest_fixations():
+    # max for all participants for all images
+    # data: 6 participants * 30 images = 180 longest fixations
+    longest_fixations = all_fixations.groupby(['Participant_ID', 'Image']).max('duration_ms')
+
+    return longest_fixations
+
+
+
 all_fixations_list = []
 all_behaviour_list = []
 
@@ -200,6 +209,9 @@ print("\nCombined fixations:", all_fixations.head())
 
 print("\nCombined behavioural data:"), all_behaviour.head()
 
+'''
+fix_trial represents fixation data for one participant
+'''
 def trial_metrics(fix_trial):
 
     f = fix_trial.sort_values('start_time_s')
@@ -225,6 +237,9 @@ def trial_metrics(fix_trial):
     else:
         path_len = 0.0
 
+    # longest fixation
+    longest_fix_ms = fix_trial['duration_ms'].max()
+
     return pd.Series({
         'n_fixations': n_fix,
         'mean_fix_dur_ms': mfd,
@@ -233,6 +248,7 @@ def trial_metrics(fix_trial):
         'dispersion_y': disp_y,
         'dispersion_r': disp_r,
         'scanpath_len_px': path_len,
+        'longest_fix_ms': longest_fix_ms,
     })
 
 # per_trial = (
@@ -242,6 +258,8 @@ def trial_metrics(fix_trial):
 #     .reset_index(drop=True)
 # )
 
+# length: 180
+# data for every participant on every image
 per_trial = (
     all_fixations
     .groupby(['Participant_ID', 'Image'])
@@ -259,6 +277,7 @@ data = per_trial.merge(
 )
 
 print("Merged eye + behavioural data:", data.head())
+print(data.columns)
 print(f"\nNumber of merged rows: {len(data)}")
 data['condition'] = np.where(data['Rating'] >= 3, 'familiar', 'unfamiliar')
 
@@ -275,6 +294,7 @@ summary_by_cond = (
         'total_dwell_ms': ['mean', 'std'],
         'dispersion_r': ['mean', 'std'],
         'scanpath_len_px': ['mean', 'std'],
+        'longest_fix_ms': ['mean', 'std'],
     })
 )
 
@@ -289,7 +309,8 @@ per_subj_cond = (
         mean_fix_dur_ms=('mean_fix_dur_ms', 'mean'),  
         total_dwell_ms=('total_dwell_ms', 'sum'),
         dispersion_r=('dispersion_r', 'mean'),     
-        scanpath_len_px=('scanpath_len_px', 'sum'),   
+        scanpath_len_px=('scanpath_len_px', 'sum'),
+        longest_fix_ms=('longest_fix_ms', 'mean'),  
     )
     .reset_index()
 )
@@ -303,6 +324,10 @@ per_subj_cond['dwell_per_image_ms'] = (
 )
 per_subj_cond['scanpath_per_image_px'] = (
     per_subj_cond['scanpath_len_px'] / per_subj_cond['n_images']
+)
+# normalize that too?
+per_subj_cond['longest_fix_per_image_ms'] = (
+    per_subj_cond['longest_fix_ms'] / per_subj_cond['n_images']
 )
 
 print("\nPer-subject × condition (raw + normalized):")
@@ -318,6 +343,8 @@ group_cond_norm = (
         dwell_per_image_ms_sd=('dwell_per_image_ms', 'std'),
         scanpath_per_image_px_mean=('scanpath_per_image_px', 'mean'),
         scanpath_per_image_px_sd=('scanpath_per_image_px', 'std'),
+        longest_fix_per_image_ms_mean=('scanpath_per_image_px', 'mean'),
+        longest_fix_per_image_ms_std=('scanpath_per_image_px', 'std'),
     )
 )
 
@@ -333,6 +360,7 @@ per_subject = (
         'total_dwell_ms': 'sum',        # total viewing time
         'dispersion_r': 'mean',         # average dispersion
         'scanpath_len_px': 'mean',      # average scanpath length
+        'longest_fix_ms': 'mean',       # average duration of the longest fixation
     })
     .rename(columns={'mean_fix_dur_ms': 'MFD_ms'})
     .reset_index()
@@ -355,6 +383,11 @@ group_summary = pd.Series({
 
     'scanpath_len_px_mean': per_subject['scanpath_len_px'].mean(),
     'scanpath_len_px_sd':   per_subject['scanpath_len_px'].std(ddof=1),
+
+    'longest_fix_ms_mean': per_subject['longest_fix_ms'].mean(),
+    'longest_fix_ms_sd':   per_subject['longest_fix_ms'].std(ddof=1),
+
+    
 })
 
 print("Group-level summary (across participants):", group_summary.to_frame(name='value'))
@@ -450,6 +483,7 @@ per_subject_cond = (
         'total_dwell_ms': 'sum',        # total viewing time
         'dispersion_r': 'mean',         # average dispersion
         'scanpath_len_px': 'mean',      # average scanpath length
+        'longest_fix_ms': 'mean',       # average duration of the longest fixation
     })
     .rename(columns={'mean_fix_dur_ms': 'MFD_ms'})
     .reset_index()
@@ -593,7 +627,7 @@ print(f"Saved per-subject summary to {per_subject_file}")
 
 # 5. group-level summary (Series -> DataFrame)
 group_summary_file = os.path.join(output_dir, "group_summary.csv")
-group_summary.to_frame(name='value').to_csv(group_summary_file)
+# group_summary.to_frame(name='value').to_csv(group_summary_file)
 print(f"Saved group-level summary to {group_summary_file}")
 
 # 6. condition vs subject
